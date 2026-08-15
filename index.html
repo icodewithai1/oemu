@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>OEmu — Web Emulator</title>
+<style>
+:root{
+  --bg:#070b12; --panel:#0f1623; --panel2:#141d2e; --panel3:#1b2740;
+  --line:#22304d; --text:#e8eefc; --muted:#8aa0c4;
+  --accent:#3da5ff; --accent2:#00e0ff; --good:#3ddc97; --warn:#ffcc4d; --bad:#ff5c7c;
+  --radius:14px; --shadow:0 10px 40px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+  font-size:14px;overscroll-behavior:none;touch-action:manipulation}
+input,textarea{user-select:text;-webkit-user-select:text}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.hidden{display:none!important}
+
+/* ---------- Boot ---------- */
+#boot{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 30%,#0d2244 0%,#05080f 70%);color:#fff}
+#boot .logo{width:96px;height:96px;border-radius:22px;
+  background:linear-gradient(135deg,#1e88ff,#00e0ff);display:flex;align-items:center;justify-content:center;
+  font-size:52px;font-weight:800;letter-spacing:-2px;box-shadow:0 0 60px rgba(0,200,255,.5);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+#boot h1{margin:18px 0 4px;font-size:22px;letter-spacing:2px}
+#boot p{margin:0;color:var(--muted);font-size:12px}
+#boot .bar{margin-top:26px;width:220px;height:4px;background:#10203a;border-radius:4px;overflow:hidden}
+#boot .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .25s}
+#boot .log{margin-top:18px;font-size:11px;color:#5e7aa9;font-family:ui-monospace,Menlo,monospace;height:90px;width:280px;overflow:hidden;text-align:center}
+
+/* ---------- Lock screen ---------- */
+#lock{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,#0a1a33,#04070d);backdrop-filter:blur(20px)}
+#lock .clock{font-size:76px;font-weight:200;letter-spacing:-2px}
+#lock .date{color:var(--muted);margin-bottom:60px}
+#lock .unlock{margin-top:30px;padding:14px 30px;border-radius:30px;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.15);color:#fff;backdrop-filter:blur(10px)}
+
+/* ---------- Desktop ---------- */
+#desktop{position:fixed;inset:0;
+  background:
+    radial-gradient(1200px 700px at 80% -10%,rgba(0,180,255,.18),transparent 60%),
+    radial-gradient(900px 600px at -10% 110%,rgba(80,120,255,.18),transparent 60%),
+    linear-gradient(160deg,#070b14,#0a1322 60%,#050810);
+  padding:38px 14px 96px}
+#statusbar{position:fixed;top:0;left:0;right:0;height:36px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;font-size:12px;color:#dfe8ff;z-index:500;
+  background:linear-gradient(180deg,rgba(0,0,0,.35),transparent);padding-top:env(safe-area-inset-top)}
+#statusbar .right{display:flex;gap:8px;align-items:center}
+#statusbar .dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
+
+#appgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 10px;max-width:520px;margin:8px auto 0}
+.appicon{display:flex;flex-direction:column;align-items:center;gap:6px;color:#dbe6ff;font-size:11px;
+  text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.appicon .ic{width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;
+  font-size:28px;background:linear-gradient(135deg,#1c3a6b,#0e1d36);border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 6px 16px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08)}
+.appicon:active .ic{transform:scale(.92)}
+
+/* ---------- Right side toolbar (LDPlayer-ish) ---------- */
+#toolbar{position:fixed;right:8px;top:50%;transform:translateY(-50%);z-index:400;
+  display:flex;flex-direction:column;gap:8px;background:rgba(10,16,28,.55);padding:8px;border-radius:18px;
+  border:1px solid rgba(255,255,255,.06);backdrop-filter:blur(14px)}
+#toolbar button{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;background:rgba(255,255,255,.04)}
+#toolbar button:active{background:rgba(255,255,255,.12)}
+
+/* ---------- Nav bar ---------- */
+#navbar{position:fixed;left:0;right:0;bottom:0;height:64px;z-index:500;display:flex;align-items:center;justify-content:space-around;
+  background:rgba(8,12,20,.7);backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.07);
+  padding-bottom:env(safe-area-inset-bottom)}
+#navbar button{flex:1;height:100%;font-size:22px;color:#cdd9f4;display:flex;align-items:center;justify-content:center}
+#navbar button:active{color:#fff}
+
+/* ---------- Windows ---------- */
+#windows{position:fixed;inset:0;pointer-events:none;z-index:600}
+.win{position:absolute;pointer-events:auto;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;
+  min-width:240px;min-height:160px;animation:winopen .18s ease}
+@keyframes winopen{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.win.max{left:0!important;top:36px!important;width:100%!important;height:calc(100% - 100px)!important;border-radius:0}
+.win.min{display:none}
+.winbar{height:38px;flex-shrink:0;display:flex;align-items:center;padding:0 8px 0 12px;gap:8px;
+  background:linear-gradient(180deg,#162138,#0f1828);border-bottom:1px solid var(--line);cursor:grab}
+.winbar .ttl{flex:1;font-size:13px;font-weight:600;color:#dbe6ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.winbar .tb{display:flex;gap:6px}
+.winbar .tb button{width:22px;height:22px;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center}
+.winbar .tb .min{background:#ffcc4d;color:#000}
+.winbar .tb .max{background:#3ddc97;color:#000}
+.winbar .tb .cls{background:#ff5c7c;color:#fff}
+.winbody{flex:1;overflow:auto;background:var(--panel);position:relative}
+.winicon{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2))}
+
+/* ---------- Generic app UI ---------- */
+.app{padding:14px;color:var(--text);height:100%;overflow:auto}
+.app h2{margin:0 0 12px;font-size:16px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:13px}
+.row .k{color:var(--muted)}
+.row .v{color:#fff;font-family:ui-monospace,Menlo,monospace;font-size:12px;text-align:right;word-break:break-all}
+.btn{padding:10px 14px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#001827;
+  font-weight:700;display:inline-flex;align-items:center;gap:8px}
+.btn.sec{background:var(--panel3);color:var(--text);border:1px solid var(--line)}
+.btn:active{transform:translateY(1px)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.muted{color:var(--muted)}
+.mono{font-family:ui-monospace,Menlo,monospace}
+input[type=text],input[type=number],textarea{width:100%;padding:10px;background:#0a1120;border:1px solid var(--line);
+  border-radius:8px;color:#fff;font:inherit}
+textarea{min-height:120px;resize:vertical;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+canvas{display:block;max-width:100%}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 14px;font-size:12px}
+.kv .k{color:var(--muted)}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--panel3);font-size:11px}
+.pill.good{background:rgba(61,220,151,.15);color:var(--good)}
+.pill.bad{background:rgba(255,92,124,.15);color:var(--bad)}
+.pill.warn{background:rgba(255,204,77,.15);color:var(--warn)}
+
+/* terminal */
+.term{background:#04080f;color:#9fffd0;height:100%;padding:10px;font-family:ui-monospace,Menlo,monospace;
+  font-size:12px;overflow:auto;display:flex;flex-direction:column}
+.term .out{flex:1;white-space:pre-wrap;word-break:break-word}
+.term .in{display:flex;gap:6px;align-items:center}
+.term input{background:transparent;border:0;color:#9fffd0;flex:1;font:inherit;outline:0;padding:4px}
+
+/* notes */
+.notes-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.notes-list .note{padding:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer;
+  display:flex;justify-content:space-between;gap:8px}
+.notes-list .note:active{background:var(--panel3)}
+.notes-list .ttl{font-weight:600}
+.notes-list .del{color:var(--bad)}
+
+/* calc */
+.calc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;height:100%;background:var(--panel2)}
+.calc .display{grid-column:span 4;background:#0a1120;border:1px solid var(--line);border-radius:10px;
+  padding:14px;text-align:right;font-size:28px;font-family:ui-monospace,Menlo,monospace;overflow:hidden}
+.calc button{padding:18px 0;border-radius:10px;background:var(--panel3);font-size:18px}
+.calc button:active{background:var(--accent);color:#001827}
+.calc .op{background:#2a4a80;color:#cfe6ff}
+.calc .eq{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#001827;font-weight:700}
+
+/* files */
+.fileitem{display:flex;align-items:center;gap:10px;padding:10px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;margin-bottom:6px}
+.fileitem .ic{font-size:20px}
+.fileitem .nm{flex:1;font-size:13px;word-break:break-all}
+.fileitem button{color:var(--bad);padding:4px 8px}
+
+/* browser */
+.webkit{display:flex;flex-direction:column;height:100%}
+.webkit .bar{display:flex;gap:6px;padding:8px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.webkit .bar input{flex:1}
+.webkit iframe{flex:1;width:100%;border:0;background:#fff}
+
+/* sensors */
+.gauge{display:flex;flex-direction:column;align-items:center;gap:6px}
+.gauge canvas{background:#0a1120;border:1px solid var(--line);border-radius:10px}
+
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:#2a3a5c;border-radius:3px}
+
+/* small screens */
+@media (max-width:640px){
+  #toolbar{display:none}
+  .win{left:8px!important;right:8px!important;top:42px!important;width:auto!important;
+    height:calc(100% - 110px)!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ BOOT ============ -->
+<div id="boot">
+  <div class="logo">O</div>
+  <h1>OEmu</h1>
+  <p>Web-native runtime · v1.0</p>
+  <div class="bar"><i id="bootbar"></i></div>
+  <div class="log" id="bootlog"></div>
+</div>
+
+<!-- ============ LOCK ============ -->
+<div id="lock" class="hidden">
+  <div class="clock" id="lockclock">--:--</div>
+  <div class="date" id="lockdate"></div>
+  <div style="display:flex;flex-direction:column;gap:12px;align-items:center;margin-top:20px">
+    <div style="font-size:44px">📱</div>
+    <div class="muted">Swipe up / tap to enter</div>
+    <button class="unlock" id="unlockbtn">Unlock</button>
+  </div>
+</div>
+
+<!-- ============ DESKTOP ============ -->
+<div id="desktop" class="hidden">
+  <div id="statusbar">
+    <div><span id="statTime">--:--</span></div>
+    <div class="right">
+      <span id="statNet" title="Network">…</span>
+      <span id="statBat" title="Battery">🔋</span>
+      <span class="dot" id="statDot"></span>
+    </div>
+  </div>
+
+  <div id="appgrid"></div>
+
+  <div id="toolbar">
+    <button data-tool="vol+" title="Volume +">🔊</button>
+    <button data-tool="vol-" title="Volume −">🔉</button>
+    <button data-tool="snap" title="Screenshot">📸</button>
+    <button data-tool="rotate" title="Rotate">🔄</button>
+    <button data-tool="power" title="Power">⏻</button>
+  </div>
+
+  <div id="windows"></div>
+
+  <div id="navbar">
+    <button id="navBack" title="Back">◀</button>
+    <button id="navHome" title="Home">●</button>
+    <button id="navRecents" title="Recents">▢</button>
+  </div>
+</div>
+
+<script>
+/* =============================================================
+   OEmu — a single-file, browser-native emulator-style desktop.
+   Uses real device CPU (Web Workers), GPU (WebGL), sensors, and
+   IndexedDB for persistence. No network required at runtime.
+   ============================================================= */
+
+/* ------------ Utilities ------------ */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const el=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e};
+const fmtBytes=n=>{if(n==null)return '—';const u=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return n.toFixed(n<10?2:0)+' '+u[i]};
+const uuid=()=>'id-'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+/* ------------ Boot sequence + real hardware probe ------------ */
+const bootlog=(m)=>{const l=$('#bootlog');l.innerHTML=m+'<br>'+l.innerHTML;};
+const setBoot=(p,m)=>{$('#bootbar').style.width=p+'%';if(m)bootlog(m)};
+
+const HW={};
+function probe(){
+  HW.cores=navigator.hardwareConcurrency||1;
+  HW.memory=navigator.deviceMemory||null;
+  HW.platform=navigator.platform||navigator.userAgentData?.platform||'unknown';
+  HW.ua=navigator.userAgent;
+  HW.lang=navigator.language;
+  HW.languages=navigator.languages||[];
+  HW.online=navigator.onLine;
+  HW.conn=navigator.connection||navigator.mozConnection||null;
+  HW.touch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+  HW.maxTouch=navigator.maxTouchPoints||0;
+  HW.dpr=window.devicePixelRatio||1;
+  HW.screen={w:screen.width,h:screen.height,aw:screen.availWidth,ah:screen.availHeight,
+    orient:screen.orientation?.type||''};
+  HW.vendor=navigator.vendor;
+  HW.webdriver=navigator.webdriver;
+  // WebGL GPU
+  try{
+    const c=document.createElement('canvas');
+    const gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');
+    if(gl){
+      const dbg=gl.getExtension('WEBGL_debug_renderer_info');
+      HW.webgl={ver:gl.getParameter(gl.VERSION),sl:gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+        renderer:dbg?gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL):'(masked)',
+        vendor:dbg?gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL):'(masked)',
+        wide:gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE), point:gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE),
+        maxTex:gl.getParameter(gl.MAX_TEXTURE_SIZE), maxViewport:gl.getParameter(gl.MAX_VIEWPORT_DIMS),
+        is2:!!gl.getParameter(gl.VERSION)?.match(/WebGL 2/)};
+    }
+  }catch(e){HW.webgl=null}
+  HW.gpu=HW.webgl?.renderer||'unknown';
+  // WebGPU
+  HW.webgpu=!!navigator.gpu;
+  if(navigator.gpu){navigator.gpu.requestAdapter?.().then(a=>{HW.webgpuAdapter=a?`${a.info?.vendor||''} ${a.info?.architecture||''}`.trim():'none'}).catch(()=>{})}
+  // WASM + SIMD + threads
+  HW.wasm=typeof WebAssembly==='object';
+  HW.simd=WebAssembly?.validate?.(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,0,10,10,0,8,0,65,0,253,15,253,98,11]))||false;
+  HW.threads=typeof SharedArrayBuffer!=='undefined';
+  // Sensors
+  HW.sensors={
+    motion:('DeviceMotionEvent' in window),
+    orientation:('DeviceOrientationEvent' in window),
+    geo:('geolocation' in navigator),
+    battery:('getBattery' in navigator),
+    vib:('vibrate' in navigator),
+    camera:!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)
+  };
+}
+
+function runBenchmarks(){
+  return new Promise(resolve=>{
+    const results={};
+    // CPU: compute primes in a worker (real multi-core work)
+    const workerCode=`
+      self.onmessage=function(e){
+        if(e.data.cmd==='primes'){
+          const N=e.data.N;
+          const sieve=new Uint8Array(N+1);
+          let count=0;
+          const t0=performance.now();
+          for(let i=2;i<=N;i++){
+            if(!sieve[i]){
+              count++;
+              for(let j=i*i;j<=N;j+=i)sieve[j]=1;
+            }
+          }
+          const t=performance.now()-t0;
+          self.postMessage({count,t});
+        }
+      };
+    `;
+    const blob=new Blob([workerCode],{type:'application/javascript'});
+    const w=new Worker(URL.createObjectURL(blob));
+    let done=0;
+    w.onmessage=e=>{
+      results.cpu={primes:e.data.count,ms:Math.round(e.data.t)};
+      // score: primes/second normalized
+      results.cpu.score=Math.round((e.data.count/(e.data.t/1000))/1000);
+      done++;if(done===2)finish();
+    };
+    // GPU: render N frames of a heavy fragment shader
+    try{
+      const c=document.createElement('canvas');c.width=512;c.height=512;
+      const gl=c.getContext('webgl2')||c.getContext('webgl');
+      if(!gl)throw 0;
+      const vs=gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vs,`attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`);
+      gl.compileShader(vs);
+      const fs=gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fs,`precision highp float;uniform float t;uniform vec2 r;
+        float m(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
+        vec3 rm(vec3 ro,vec3 rd){float td=0.;vec3 col=vec3(0.);
+        for(int i=0;i<40;i++){vec3 p=ro+rd*td;float d=m(p-vec3(sin(t)*.5,cos(t*.7)*.3,0.),vec3(.4));
+        col+=vec3(.4,.7,1.0)*exp(-d*8.)*.04;td+=max(d,.01);if(td>4.)break;}return col;}
+        void main(){vec2 uv=(gl_FragCoord.xy-.5*r)/r.y;
+        vec3 ro=vec3(0,0,2),rd=normalize(vec3(uv,-1.5));
+        vec3 col=rm(ro,rd);col=pow(col,vec3(.4545));
+        gl_FragColor=vec4(col,1);}`);
+      gl.compileShader(fs);
+      const prog=gl.createProgram();gl.attachShader(prog,vs);gl.attachShader(prog,fs);gl.linkProgram(prog);gl.useProgram(prog);
+      const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+      const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+      const tLoc=gl.getUniformLocation(prog,'t');const rLoc=gl.getUniformLocation(prog,'r');
+      gl.uniform2f(rLoc,512,512);
+      const FRAMES=120;let f=0;const t0=performance.now();
+      function frame(){
+        gl.uniform1f(tLoc,f*0.03);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+        f++;if(f<FRAMES)requestAnimationFrame(frame);
+        else{
+          const ms=performance.now()-t0;
+          results.gpu={frames:FRAMES,ms:Math.round(ms),fps:Math.round(FRAMES/(ms/1000))};
+          results.gpu.score=results.gpu.fps;
+          done++;if(done===2)finish();
+        }
+      }
+      frame();
+    }catch(e){
+      results.gpu={error:'no webgl'};done++;if(done===2)finish();
+    }
+    w.postMessage({cmd:'primes',N:4000000});
+    function finish(){w.terminate();resolve(results)}
+  });
+}
+
+async function boot(){
+  const steps=[
+    [8,'Probing hardware…',()=>probe()],
+    [22,'Starting CPU workers…',()=>{}],
+    [34,'Initializing GPU (WebGL)…',()=>{}],
+    [46,'Mounting IndexedDB storage…',()=>DB.open()],
+    [60,'Running benchmark…',async()=>{HW.bench=await runBenchmarks()}],
+    [78,'Loading system apps…',()=>{}],
+    [92,'Starting runtime…',()=>{startDesktop()}],
+    [100,'Ready.',()=>{}]
+  ];
+  for(const [p,msg,fn] of steps){setBoot(p,msg);try{await fn()}catch(e){console.warn(e)}}
+  setTimeout(()=>{$('#boot').classList.add('hidden');$('#lock').classList.remove('hidden');updateLockClock()},400);
+}
+
+/* ------------ IndexedDB ------------ */
+const DB={
+  name:'oemu',ver:2,db:null,
+  open(){return new Promise((res,rej)=>{
+    const r=indexedDB.open(this.name,this.ver);
+    r.onupgradeneeded=e=>{const d=e.target.result;
+      ['notes','files','settings','apps'].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:'id'})});
+    };
+    r.onsuccess=e=>{this.db=e.target.result;res()};
+    r.onerror=rej;
+  })},
+  tx(s,m='readwrite'){return this.db.transaction(s,m).objectStore(s)},
+  put(s,o){return new Promise((res,rej)=>{const r=this.tx(s).put(o);r.onsuccess=()=>res(o);r.onerror=rej})},
+  getAll(s){return new Promise((res,rej)=>{const r=this.tx(s,'readonly').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=rej})},
+  del(s,id){return new Promise((res,rej)=>{const r=this.tx(s).delete(id);r.onsuccess=()=>res();r.onerror=rej})},
+  get(s,id){return new Promise((res,rej)=>{const r=this.tx(s,'readonly').get(id);r.onsuccess=()=>res(r.result);r.onerror=rej})},
+};
+
+/* ------------ Window manager ------------ */
+const WM={
+  z:100,wins:{},
+  create({title,icon,html,width=420,height=360,app,bodyClass=''}){
+    const id=uuid();
+    const win=el('div','win');
+    win.style.width=Math.min(width,window.innerWidth-20)+'px';
+    win.style.height=Math.min(height,window.innerHeight-120)+'px';
+    win.style.left=(40+Math.random()*80)+'px';
+    win.style.top=(50+Math.random()*40)+'px';
+    win.style.zIndex=++this.z;
+    win.innerHTML=`
+      <div class="winbar">
+        <div class="winicon">${icon||'▢'}</div>
+        <div class="ttl">${title}</div>
+        <div class="tb">
+          <button class="min" title="Minimize">–</button>
+          <button class="max" title="Maximize">▢</button>
+          <button class="cls" title="Close">✕</button>
+        </div>
+      </div>
+      <div class="winbody ${bodyClass}"></div>`;
+    const body=$('.winbody',win);
+    if(html)body.innerHTML=html;
+    $('#windows').appendChild(win);
+    const rec={id,win,body,title,icon,app};
+    this.wins[id]=rec;
+    // drag
+    const bar=$('.winbar',win);let drag=null;
+    const start=(x,y)=>{drag={x,y,l:win.offsetLeft,t:win.offsetTop};win.style.zIndex=++this.z};
+    bar.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;bar.setPointerCapture(e.pointerId);
+      start(e.clientX,e.clientY)});
+    bar.addEventListener('pointermove',e=>{if(!drag)return;
+      win.style.left=Math.max(0,drag.l+e.clientX-drag.x)+'px';
+      win.style.top=Math.max(36,drag.t+e.clientY-drag.y)+'px'});
+    bar.addEventListener('pointerup',()=>drag=null);
+    bar.addEventListener('click',()=>{win.style.zIndex=++this.z});
+    $('.cls',win).onclick=()=>{win.remove();delete this.wins[id];refreshTaskbar()};
+    $('.min',win).onclick=()=>{win.classList.add('min');refreshTaskbar()};
+    $('.max',win).onclick=()=>{win.classList.toggle('max')};
+    refreshTaskbar();
+    if(app&&Apps[app]&&Apps[app].mount)Apps[app].mount(body,rec);
+    return rec;
+  },
+  focus(id){const w=this.wins[id];if(!w)return;w.win.classList.remove('min');w.win.style.zIndex=++this.z;refreshTaskbar()},
+  close(id){const w=this.wins[id];if(w){w.win.remove();delete this.wins[id];refreshTaskbar()}}
+};
+
+function refreshTaskbar(){
+  // simple indicator: no custom recents UI needed; navbar handles it
+}
+
+/* =========================================================
+   APPS
+   ========================================================= */
+const Apps={};
+
+/* ---------- Settings ---------- */
+Apps.settings={
+  icon:'⚙️',title:'Settings',
+  render(){
+    const b=HW.bench||{};
+    return `
+    <div class="app">
+      <h2>Device Info</h2>
+      <div class="card">
+        <div class="kv">
+          <div class="k">CPU cores</div><div>${HW.cores}</div>
+          <div class="k">Device memory</div><div>${HW.memory?HW.memory+' GB':'n/a'}</div>
+          <div class="k">Platform</div><div>${HW.platform}</div>
+          <div class="k">Vendor</div><div>${HW.vendor}</div>
+          <div class="k">Language</div><div>${HW.lang}</div>
+          <div class="k">Touch points</div><div>${HW.maxTouch}</div>
+          <div class="k">Pixel ratio</div><div>${HW.dpr}</div>
+          <div class="k">Screen</div><div>${HW.screen.w}×${HW.screen.h} · ${HW.screen.orient}</div>
+          <div class="k">Online</div><div>${HW.online?'<span class="pill good">yes</span>':'<span class="pill bad">no</span>'}</div>
+        </div>
+      </div>
+      <h2>GPU / Graphics</h2>
+      <div class="card">
+        <div class="kv">
+          <div class="k">Renderer</div><div>${HW.gpu}</div>
+          <div class="k">WebGL</div><div class="v">${(HW.webgl?.ver||'none').replace('WebGL','').trim()}${HW.webgl?.is2?' 2':''}</div>
+          <div class="k">GLSL</div><div class="v">${HW.webgl?.sl||'—'}</div>
+          <div class="k">Max texture</div><div>${HW.webgl?.maxTex||'—'}px</div>
+          <div class="k">Max viewport</div><div>${HW.webgl?.maxViewport?.join('×')||'—'}</div>
+          <div class="k">WebGPU</div><div>${HW.webgpu?'<span class="pill good">available</span>':'<span class="pill warn">no</span>'}</div>
+        </div>
+      </div>
+      <h2>Runtime</h2>
+      <div class="card">
+        <div class="kv">
+          <div class="k">WebAssembly</div><div>${HW.wasm?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">WASM SIMD</div><div>${HW.simd?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">Threads (SAB)</div><div>${HW.threads?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">Workers</div><div>${typeof Worker!=='undefined'?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">IndexedDB</div><div>${typeof indexedDB!=='undefined'?'<span class="pill good">yes</span>':'no'}</div>
+        </div>
+      </div>
+      <h2>Benchmark</h2>
+      <div class="card">
+        <div class="kv">
+          <div class="k">CPU primes/sec</div><div>${b.cpu?b.cpu.score+'k ('+b.cpu.ms+'ms)':'…'}</div>
+          <div class="k">GPU FPS (raymarch)</div><div>${b.gpu?b.gpu.fps+' fps ('+b.gpu.ms+'ms)':'…'}</div>
+        </div>
+        <div class="btnrow"><button class="btn sec" id="rerun">Re-run benchmark</button></div>
+      </div>
+      <h2>Sensors & Peripherals</h2>
+      <div class="card">
+        <div class="kv">
+          <div class="k">Motion</div><div>${HW.sensors.motion?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">Orientation</div><div>${HW.sensors.orientation?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">Geolocation</div><div>${HW.sensors.geo?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">Battery</div><div>${HW.sensors.battery?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">Vibration</div><div>${HW.sensors.vib?'<span class="pill good">yes</span>':'no'}</div>
+          <div class="k">Camera/Mic</div><div>${HW.sensors.camera?'<span class="pill good">yes</span>':'no'}</div>
+        </div>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:14px;line-height:1.5">
+        OEmu runs entirely on this device's CPU and GPU inside the browser sandbox.
+        Native APK binaries cannot be executed from a web page; apps shown here are
+        web-native. Your data is stored locally in IndexedDB.
+      </div>
+    </div>`;
+  },
+  mount(body){
+    body.innerHTML=this.render();
+    $('#rerun',body)?.addEventListener('click',async e=>{
+      e.target.textContent='Running…';
+      HW.bench=await runBenchmarks();
+      body.innerHTML=this.render();this.mount(body);
+    });
+  }
+};
+
+/* ---------- Benchmark ---------- */
+Apps.bench={
+  icon:'📊',title:'Benchmark',
+  mount(body){
+    body.innerHTML=`<div class="app">
+      <h2>Hardware Benchmark</h2>
+      <div class="card">
+        <div id="benchStatus" class="muted">Ready.</div>
+        <div class="btnrow">
+          <button class="btn" id="go">Run full test</button>
+          <button class="btn sec" id="gpuDemo">GPU shader demo</button>
+        </div>
+      </div>
+      <div class="card">
+        <canvas id="bcv" width="300" height="60" style="width:100%;height:60px;background:#0a1120;border-radius:8px"></canvas>
+        <div id="results"></div>
+      </div>
+    </div>`;
+    $('#go',body).onclick=async()=>{
+      $('#benchStatus',body).textContent='Running CPU + GPU tests…';
+      const r=await runBenchmarks();HW.bench=r;
+      $('#benchStatus',body).textContent='Done.';
+      $('#results',body).innerHTML=`
+        <div class="kv" style="margin-top:10px">
+          <div class="k">CPU score</div><div><b>${r.cpu.score}k</b> primes/s (${r.cpu.ms}ms)</div>
+          <div class="k">GPU score</div><div><b>${r.gpu.fps} fps</b> · ${r.gpu.frames} frames in ${r.gpu.ms}ms</div>
+        </div>`;
+      // bar
+      const cv=$('#bcv',body),x=cv.getContext('2d');x.clearRect(0,0,cv.width,cv.height);
+      x.fillStyle='#3da5ff';x.fillRect(0,10,Math.min(300,r.cpu.score*3),18);
+      x.fillStyle='#00e0ff';x.fillRect(0,34,Math.min(300,r.gpu.fps*3),18);
+      x.fillStyle='#fff';x.font='11px sans-serif';x.fillText('CPU',4,23);x.fillText('GPU',4,47);
+    };
+    $('#gpuDemo',body).onclick=()=>WM.create({title:'GPU Shader',icon:'🎮',app:'gpu',width:560,height:420});
+  }
+};
+
+/* ---------- GPU shader demo (uses device GPU) ---------- */
+Apps.gpu={
+  icon:'🎮',title:'GPU Demo',
+  mount(body,rec){
+    body.innerHTML=`<div style="position:relative;height:100%;display:flex;flex-direction:column">
+      <canvas id="glcv" style="flex:1;width:100%;background:#000;touch-action:none"></canvas>
+      <div style="padding:8px;background:var(--panel2);font-size:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="muted">Fragment shader on your GPU</span>
+        <span id="fps" class="pill good">0 fps</span>
+        <label style="display:flex;align-items:center;gap:6px">speed
+          <input id="spd" type="range" min="0" max="3" step="0.1" value="1"></label>
+        <button class="btn sec" id="vib" style="padding:6px 10px">Vibrate</button>
+      </div></div>`;
+    const cv=$('#glcv',body);
+    const gl=cv.getContext('webgl2')||cv.getContext('webgl');
+    if(!gl){body.innerHTML='<div class="app"><b>WebGL not available</b></div>';return}
+    const vs=gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs,`attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`);gl.compileShader(vs);
+    const fs=gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs,`precision highp float;uniform float t;uniform vec2 r;
+      mat2 rot(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
+      float map(vec3 p){p.xz*=rot(t*.3);p.yz*=rot(t*.5);
+      vec3 q=fract(p)-.5;return length(max(abs(q)-.25,0.))-.06;}
+      void main(){vec2 uv=(gl_FragCoord.xy-.5*r)/r.y;
+      vec3 ro=vec3(0,0,-3),rd=normalize(vec3(uv,1));vec3 col=vec3(0);
+      for(int i=0;i<60;i++){float d=map(ro);if(d<.001){col=vec3(.4+.6*sin(t+ro.y*4.),.6,1.);break;}
+      if(d>20.)break;ro+=rd*d*.7;}
+      col=mix(col,vec3(.02,.05,.1),1.-exp(-.0008*dot(ro,ro)));
+      gl_FragColor=vec4(col,1);}`);
+    gl.compileShader(fs);
+    if(!gl.getShaderParameter(fs,gl.COMPILE_STATUS)){
+      body.innerHTML='<div class="app"><b>Shader compile error:</b><pre>'+gl.getShaderInfoLog(fs)+'</pre></div>';return}
+    const prog=gl.createProgram();gl.attachShader(prog,vs);gl.attachShader(prog,fs);gl.linkProgram(prog);gl.useProgram(prog);
+    const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+    const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    const tLoc=gl.getUniformLocation(prog,'t');const rLoc=gl.getUniformLocation(prog,'r');
+    let speed=1, raf, t0=performance.now(), frames=0, lastFps=t0;
+    const fpsEl=$('#fps',body);
+    $('#spd',body).oninput=e=>speed=parseFloat(e.target.value);
+    $('#vib',body).onclick=()=>navigator.vibrate?.([40,80,40]);
+    function resize(){const r=cv.getBoundingClientRect();cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;
+      gl.viewport(0,0,cv.width,cv.height);gl.uniform2f(rLoc,cv.width,cv.height)}
+    resize();window.addEventListener('resize',resize);
+    function frame(){
+      const now=performance.now();
+      gl.uniform1f(tLoc,(now-t0)/1000*speed);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      frames++;if(now-lastFps>500){fpsEl.textContent=Math.round(frames*1000/(now-lastFps))+' fps';frames=0;lastFps=now}
+      raf=requestAnimationFrame(frame);
+    }
+    frame();
+    rec.cleanup=()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',resize)};
+  },
+  cleanup(){}
+};
+
+/* ---------- Sensors (uses real accelerometer / gyro) ---------- */
+Apps.sensors={
+  icon:'📡',title:'Sensors',
+  mount(body){
+    body.innerHTML=`<div class="app">
+      <h2>Device Motion</h2>
+      <div class="card">
+        <div class="gauge">
+          <canvas id="tilt" width="280" height="220"></canvas>
+        </div>
+        <div class="kv" style="margin-top:10px">
+          <div class="k">Accelerometer</div><div id="acc">—</div>
+          <div class="k">Gyroscope</div><div id="gyr">—</div>
+          <div class="k">Rotation rate</div><div id="rot">—</div>
+          <div class="k">Interval</div><div id="ivl">—</div>
+        </div>
+        <div class="btnrow"><button class="btn" id="start">Enable sensors</button>
+          <button class="btn sec" id="vib">Vibrate</button></div>
+      </div>
+      <h2>Geolocation</h2>
+      <div class="card">
+        <div class="kv">
+          <div class="k">Status</div><div id="geoStatus">not started</div>
+          <div class="k">Latitude</div><div id="lat">—</div>
+          <div class="k">Longitude</div><div id="lon">—</div>
+          <div class="k">Accuracy</div><div id="acc2">—</div>
+          <div class="k">Altitude</div><div id="alt">—</div>
+          <div class="k">Heading</div><div id="hed">—</div>
+          <div class="k">Speed</div><div id="spd2">—</div>
+        </div>
+        <div class="btnrow"><button class="btn sec" id="getGeo">Get location</button>
+          <button class="btn sec" id="watch">Watch position</button></div>
+      </div>
+    </div>`;
+    const cv=$('#tilt',body),cx=cv.getContext('2d');
+    let state={ax:0,ay:0,az:0,gx:0,gy:0,gz:0,ra:0,rb:0,rg:0};
+    function draw(){
+      cx.fillStyle='#0a1120';cx.fillRect(0,0,cv.width,cv.height);
+      cx.save();cx.translate(140,110);
+      const ang=Math.atan2(state.ay,state.ax);const mag=Math.min(120,Math.hypot(state.ax,state.ay)*12);
+      cx.rotate(ang);cx.fillStyle='#3da5ff';cx.beginPath();cx.arc(mag-20,0,26,0,Math.PI*2);cx.fill();
+      cx.restore();
+      cx.fillStyle='#8aa0c4';cx.font='11px sans-serif';
+      cx.fillText('Tilt from accelerometer',10,20);
+      cx.fillText(`mag ${mag.toFixed(0)}`,10,200);
+      requestAnimationFrame(draw);
+    }
+    draw();
+    function onMotion(e){
+      if(e.accelerationIncludingGravity){
+        state.ax=e.accelerationIncludingGravity.x||0;
+        state.ay=e.accelerationIncludingGravity.y||0;
+        state.az=e.accelerationIncludingGravity.z||0;
+      }
+      if(e.acceleration){
+        state.gx=e.acceleration.x||0;state.gy=e.acceleration.y||0;state.gz=e.acceleration.z||0;
+      }
+      if(e.rotationRate){state.ra=e.rotationRate.alpha||0;state.rb=e.rotationRate.beta||0;state.rg=e.rotationRate.gamma||0}
+      $('#acc').textContent=`${state.ax.toFixed(2)}, ${state.ay.toFixed(2)}, ${state.az.toFixed(2)}`;
+      $('#gyr').textContent=`${state.gx.toFixed(2)}, ${state.gy.toFixed(2)}, ${state.gz.toFixed(2)}`;
+      $('#rot').textContent=`α${state.ra.toFixed(0)} β${state.rb.toFixed(0)} γ${state.rg.toFixed(0)}`;
+      $('#ivl').textContent=e.interval+' ms';
+    }
+    $('#start',body).onclick=async()=>{
+      if(typeof DeviceMotionEvent!=='undefined'&&DeviceMotionEvent.requestPermission){
+        try{const r=await DeviceMotionEvent.requestPermission();
+          if(r==='granted'){window.addEventListener('devicemotion',onMotion);$('#start').textContent='Sensors on';}
+          else alert('Permission denied');
+        }catch(e){alert('Could not start: '+e.message)}
+      }else if('DeviceMotionEvent' in window){
+        window.addEventListener('devicemotion',onMotion);$('#start').textContent='Sensors on';
+      }else{
+        alert('Device motion not available on this device');
+      }
+    };
+    $('#vib',body).onclick=()=>navigator.vibrate?.([100,50,100,50,200]);
+    function showPos(p){
+      $('#geoStatus').innerHTML='<span class="pill good">locked</span>';
+      $('#lat').textContent=p.coords.latitude.toFixed(6);
+      $('#lon').textContent=p.coords.longitude.toFixed(6);
+      $('#acc2').textContent=p.coords.accuracy.toFixed(0)+' m';
+      $('#alt').textContent=p.coords.altitude!=null?p.coords.altitude.toFixed(1)+' m':'—';
+      $('#hed').textContent=p.coords.heading!=null?p.coords.heading.toFixed(0)+'°':'—';
+      $('#spd2').textContent=p.coords.speed!=null?p.coords.speed.toFixed(1)+' m/s':'—';
+    }
+    $('#getGeo',body).onclick=()=>{
+      if(!navigator.geolocation){alert('No geolocation');return}
+      $('#geoStatus').innerHTML='<span class="pill warn">locating…</span>';
+      navigator.geolocation.getCurrentPosition(showPos,e=>$('#geoStatus').textContent='error: '+e.message,
+        {enableHighAccuracy:true,timeout:15000});
+    };
+    $('#watch',body).onclick=()=>{
+      if(!navigator.geolocation)return;
+      $('#geoStatus').innerHTML='<span class="pill warn">watching…</span>';
+      navigator.geolocation.watchPosition(showPos,e=>$('#geoStatus').textContent='error: '+e.message,
+        {enableHighAccuracy:true});
+    };
+  }
+};
+
+/* ---------- Camera (uses getUserMedia) ---------- */
+Apps.camera={
+  icon:'📷',title:'Camera',
+  mount(body,rec){
+    body.innerHTML=`<div class="app" style="padding:0;display:flex;flex-direction:column;height:100%">
+      <video id="vid" autoplay playsinline style="flex:1;width:100%;object-fit:cover;background:#000"></video>
+      <div style="padding:10px;display:flex;gap:8px;background:var(--panel2)">
+        <button class="btn" id="start">Start camera</button>
+        <button class="btn sec" id="shot">Take photo</button>
+        <button class="btn sec" id="switch">Flip</button>
+      </div>
+      <canvas id="photo" style="display:none"></canvas>
+      <div id="shots" style="padding:8px;display:flex;gap:6px;overflow:auto;background:#05080f"></div>
+    </div>`;
+    let stream=null,facing='user';
+    async function start(){
+      try{
+        if(stream)stream.getTracks().forEach(t=>t.stop());
+        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:false});
+        $('#vid',body).srcObject=stream;
+      }catch(e){alert('Camera error: '+e.message+'\n\nNote: in-app web views may restrict camera access.')}
+    }
+    $('#start',body).onclick=start;
+    $('#switch',body).onclick=()=>{facing=facing==='user'?'environment':'user';if(stream)start()};
+    $('#shot',body).onclick=()=>{
+      const v=$('#vid',body),c=$('#photo',body);if(!v.videoWidth)return;
+      c.width=v.videoWidth;c.height=v.videoHeight;
+      c.getContext('2d').drawImage(v,0,0);
+      const url=c.toDataURL('image/jpeg',0.8);
+      const im=new Image();im.src=url;im.style.height='60px';im.style.borderRadius='6px';
+      $('#shots',body).prepend(im);
+      // persist to files DB
+      DB.put('files',{id:'shot-'+Date.now(),name:'photo-'+Date.now()+'.jpg',type:'image/jpeg',data:url,ts:Date.now()});
+      navigator.vibrate?.(30);
+    };
+    rec.cleanup=()=>{if(stream)stream.getTracks().forEach(t=>t.stop())};
+  }
+};
+
+/* ---------- Notes (IndexedDB) ---------- */
+Apps.notes={
+  icon:'📝',title:'Notes',
+  async mount(body){
+    body.innerHTML=`<div class="app">
+      <div class="btnrow"><button class="btn" id="new">+ New note</button></div>
+      <div class="notes-list" id="list"></div>
+      <div id="editor" class="hidden">
+        <input type="text" id="title" placeholder="Title" style="margin-bottom:8px">
+        <textarea id="text" placeholder="Write something…"></textarea>
+        <div class="btnrow"><button class="btn" id="save">Save</button>
+          <button class="btn sec" id="cancel">Cancel</button>
+          <button class="btn sec" id="del" style="margin-left:auto;background:#3a1820;color:#ff9fb0">Delete</button></div>
+      </div>
+    </div>`;
+    let editing=null;
+    const list=$('#list',body);
+    async function refresh(){
+      const notes=await DB.getAll('notes');
+      notes.sort((a,b)=>(b.ts||0)-(a.ts||0));
+      list.innerHTML=notes.map(n=>`<div class="note" data-id="${n.id}">
+        <div><div class="ttl">${(n.title||'Untitled').replace(/</g,'&lt;')}</div>
+        <div class="muted" style="font-size:11px">${new Date(n.ts).toLocaleString()}</div></div>
+        <span>›</span></div>`).join('')||'<div class="muted">No notes yet.</div>';
+      $$('.note',list).forEach(e=>e.onclick=()=>edit(e.dataset.id));
+    }
+    async function edit(id){editing=await DB.get('notes',id);
+      $('#title',body).value=editing.title||'';$('#text',body).value=editing.text||'';
+      $('#editor',body).classList.remove('hidden');list.classList.add('hidden');
+    }
+    $('#new',body).onclick=()=>{editing={id:uuid(),title:'',text:'',ts:Date.now()};
+      $('#title',body).value='';$('#text',body).value='';
+      $('#editor',body).classList.remove('hidden');list.classList.add('hidden')};
+    $('#cancel',body).onclick=()=>{$('#editor',body).classList.add('hidden');list.classList.remove('hidden')};
+    $('#save',body).onclick=async()=>{
+      editing.title=$('#title',body).value||'Untitled';
+      editing.text=$('#text',body).value;editing.ts=Date.now();
+      await DB.put('notes',editing);
+      $('#editor',body).classList.add('hidden');list.classList.remove('hidden');refresh();
+    };
+    $('#del',body).onclick=async()=>{if(editing?.id){await DB.del('notes',editing.id);
+      $('#editor',body).classList.add('hidden');list.classList.remove('hidden');refresh()}};
+    refresh();
+  }
+};
+
+/* ---------- Files (IndexedDB) ---------- */
+Apps.files={
+  icon:'📁',title:'Files',
+  async mount(body){
+    body.innerHTML=`<div class="app">
+      <h2>Files</h2>
+      <div class="card">
+        <input type="text" id="fn" placeholder="filename.txt" style="margin-bottom:6px">
+        <textarea id="ct" placeholder="file contents"></textarea>
+        <div class="btnrow"><button class="btn" id="save">Save file</button>
+          <button class="btn sec" id="export">Export all (JSON)</button></div>
+      </div>
+      <div id="flist"></div>
+    </div>`;
+    async function refresh(){
+      const files=await DB.getAll('files');
+      files.sort((a,b)=>(b.ts||0)-(a.ts||0));
+      $('#flist',body).innerHTML=files.map(f=>{
+        const size=f.data?f.data.length:(f.content?.length||0);
+        return `<div class="fileitem" data-id="${f.id}">
+          <div class="ic">${f.type==='image/jpeg'?'🖼️':'📄'}</div>
+          <div class="nm"><div>${f.name}</div>
+          <div class="muted" style="font-size:11px">${fmtBytes(size)} · ${new Date(f.ts).toLocaleString()}</div></div>
+          <button data-id="${f.id}">✕</button></div>`;
+      }).join('')||'<div class="muted">No files.</div>';
+      $$('.fileitem',body).forEach(row=>{
+        row.querySelector('button').onclick=async e=>{e.stopPropagation();await DB.del('files',row.dataset.id);refresh()};
+        row.onclick=()=>{
+          const f=files.find(x=>x.id===row.dataset.id);
+          if(f.type==='image/jpeg'){
+            WM.create({title:f.name,icon:'🖼️',width:480,height:360,
+              html:`<div style="padding:10px;text-align:center"><img src="${f.data}" style="max-width:100%;border-radius:8px"></div>`});
+          }else if(f.content){
+            WM.create({title:f.name,icon:'📄',width:440,height:320,
+              html:`<div class="app" style="white-space:pre-wrap">${(f.content||'').replace(/</g,'&lt;')}</div>`});
+          }
+        };
+      });
+    }
+    $('#save',body).onclick=async()=>{
+      const name=$('#fn',body).value.trim()||'untitled.txt';
+      const content=$('#ct',body).value;
+      await DB.put('files',{id:uuid(),name,content,ts:Date.now()});
+      $('#fn',body).value='';$('#ct',body).value='';refresh();
+    };
+    $('#export',body).onclick=async()=>{
+      const files=await DB.getAll('files');
+      const blob=new Blob([JSON.stringify(files,null,2)],{type:'application/json'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download='oemu-files.json';a.click();
+    };
+    refresh();
+  }
+};
+
+/* ---------- Terminal ---------- */
+Apps.terminal={
+  icon:'⌨️',title:'Terminal',
+  mount(body){
+    body.innerHTML=`<div class="term">
+      <div class="out" id="out"></div>
+      <div class="in"><span style="color:#3ddc97">oemu@device:~$</span><input id="cmd" autofocus></div>
+    </div>`;
+    const out=$('#out',body),inp=$('#cmd',body);
+    const print=s=>{out.textContent+=s+'\n';body.scrollTop=body.scrollHeight};
+    print('OEmu shell v1.0  —  type "help"');
+    const fs={};
+    const cmds={
+      help:()=>'commands: help, info, neofetch, echo, date, ls, cat, ps, bench, vibrate, geo, clear, exit',
+      info:()=>`cores=${HW.cores} gpu=${HW.gpu} mem=${HW.memory||'?'}GB platform=${HW.platform}`,
+      neofetch:()=>`
+   ______    ${navigator.platform}
+  / __/ /_   host: ${HW.vendor}
+ _\\ \\/ __/   gpu: ${HW.gpu}
+/___/\\__/    cores: ${HW.cores}  mem: ${HW.memory||'?'}GB
+             webgl: ${HW.webgl?.ver||'n/a'}
+             wasm: ${HW.wasm} simd: ${HW.simd} threads: ${HW.threads}
+             sensors: motion=${HW.sensors.motion} geo=${HW.sensors.geo} vib=${HW.sensors.vib}`,
+      echo:a=>a,
+      date:()=>new Date().toString(),
+      ls:()=>Object.keys(fs).join('  ')||'(empty)',
+      cat:a=>{const n=a.trim();return fs[n]??`cat: ${n}: No such file`},
+      ps:()=>'PID TTY TIME CMD\n  1 ?   00:00:00 oemu-runtime\n  2 ?   00:00:00 gpu-driver\n  3 ?   00:00:00 sensor-hub',
+      clear:()=>{out.textContent='';return ''},
+      exit:()=>{WM.close(body.closest('.win').dataset.winid);return ''},
+      vibrate:()=>{navigator.vibrate?.([100,50,100]);return 'bzzz'},
+      geo:()=>{if(!navigator.geolocation)return 'no gps';
+        navigator.geolocation.getCurrentPosition(p=>print(`lat ${p.coords.latitude}  lon ${p.coords.longitude}  acc ${p.coords.accuracy}m`),
+          e=>print('geo error: '+e.message));return 'locating…'},
+      async bench(){const r=await runBenchmarks();return `cpu ${r.cpu.score}k primes/s | gpu ${r.gpu.fps} fps`}
+    };
+    inp.addEventListener('keydown',e=>{
+      if(e.key!=='Enter')return;const line=inp.value;inp.value='';
+      print('oemu@device:~$ '+line);
+      const [name,...args]=line.trim().split(/\s+/);if(!name)return;
+      const fn=cmds[name];
+      if(!fn){print('command not found: '+name);return}
+      Promise.resolve(fn(args.join(' '))).then(r=>{if(r)print(r)}).catch(e=>print('error: '+e.message));
+    });
+  }
+};
+
+/* ---------- Calculator ---------- */
+Apps.calc={
+  icon:'🧮',title:'Calculator',width:320,height:420,
+  mount(body){
+    body.innerHTML=`<div class="calc">
+      <div class="display" id="d">0</div>
+      ${['C','(',')','/','7','8','9','*','4','5','6','-','1','2','3','+','0','.','⌫','='].map(k=>
+        `<button class="${'+-*/'.includes(k)?'op':''}${k==='='?' eq':''}" data-k="${k}">${k}</button>`).join('')}
+    </div>`;
+    const d=$('#d',body);let expr='';
+    body.addEventListener('click',e=>{
+      const k=e.target.dataset.k;if(!k)return;
+      if(k==='C')expr='';
+      else if(k==='⌫')expr=expr.slice(0,-1);
+      else if(k==='='){try{expr=String(Function('"use strict";return ('+expr+')')())}catch{expr='Error'}}
+      else expr+=k;
+      d.textContent=expr||'0';
+    });
+  }
+};
+
+/* ---------- Browser (sandboxed iframe) ---------- */
+Apps.browser={
+  icon:'🌐',title:'Browser',width:560,height:480,
+  mount(body){
+    body.innerHTML=`<div class="webkit">
+      <div class="bar"><button class="btn sec" id="go" style="padding:8px 12px">Go</button>
+      <input type="text" id="url" placeholder="https://example.com" value="https://example.com"></div>
+      <iframe id="fr" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    </div>`;
+    const inp=$('#url',body),fr=$('#fr',body);
+    const go=()=>{let u=inp.value.trim();if(!/^https?:\/\//.test(u))u='https://'+u;fr.src=u};
+    $('#go',body).onclick=go;inp.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    go();
+  }
+};
+
+/* ---------- About ---------- */
+Apps.about={
+  icon:'ℹ️',title:'About',width:380,height:360,
+  render(){return `
+  <div class="app" style="text-align:center;padding-top:30px">
+    <div style="font-size:56px">🅾️</div>
+    <h2 style="margin-top:8px">OEmu</h2>
+    <div class="muted">Web-native runtime · v1.0</div>
+    <div style="margin-top:20px;text-align:left;line-height:1.7" class="card">
+      OEmu is an emulator-style desktop that runs entirely inside your browser
+      using the device's own CPU (Web Workers, WebAssembly) and GPU (WebGL/WebGPU).
+      Storage uses IndexedDB. Sensors, camera, geolocation, and vibration are
+      accessed through standard web APIs — no native code, no drivers.
+    </div>
+    <div class="muted" style="font-size:11px;margin-top:12px">
+      This is not LDPlayer and does not run Android APKs. Browsers cannot execute
+      untrusted native binaries or load kernel/hypervisor drivers.
+    </div>
+  </div>`},
+  mount(body){body.innerHTML=this.render()}
+};
+
+/* ---------- App grid order ---------- */
+const APP_ORDER=['settings','bench','gpu','sensors','camera','notes','files','terminal','calc','browser','about'];
+
+/* ------------ Desktop start ------------ */
+function startDesktop(){
+  $('#desktop').classList.remove('hidden');
+  const grid=$('#appgrid');
+  for(const id of APP_ORDER){
+    const a=Apps[id];
+    const ic=el('div','appicon');
+    ic.innerHTML=`<div class="ic">${a.icon}</div><div>${a.title}</div>`;
+    ic.onclick=()=>WM.create({title:a.title,icon:a.icon,app:id,width:a.width||420,height:a.height||380});
+    grid.appendChild(ic);
+  }
+  // status updates
+  updateClock();setInterval(updateClock,10000);
+  if(navigator.getBattery)navigator.getBattery().then(b=>{
+    const up=()=>{$('#statBat').textContent=(b.charging?'⚡':'🔋')+Math.round(b.level*100)+'%'};up();
+    b.addEventListener('levelchange',up);b.addEventListener('chargechange',up);
+  });
+  const upNet=()=>{const c=HW.conn;$('#statNet').textContent=!navigator.onLine?'offline':(c?.effectiveType||'online')};
+  upNet();window.addEventListener('online',upNet);window.addEventListener('offline',upNet);
+  if(HW.conn)HW.conn.addEventListener('change',upNet);
+  // toolbar
+  $$('#toolbar button').forEach(b=>b.onclick=()=>{
+    const t=b.dataset.tool;
+    if(t==='snap'){
+      const html2=document.documentElement.cloneNode(true);
+      // Screenshot of visible screen via SVG foreignObject (best effort)
+      const w=window.innerWidth,h=window.innerHeight;
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+        <foreignObject width="100%" height="100%">${new XMLSerializer().serializeToString(document.documentElement).replace(/#/g,'%23')}</foreignObject></svg>`;
+      const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0);
+        const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download='oemu-shot.png';a.click()};
+      img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+    }else if(t==='rotate'){screen.orientation?.lock?.('portrait').catch(()=>{});
+      document.getElementById('desktop').style.transform='rotate(90deg)';setTimeout(()=>document.getElementById('desktop').style.transform='',1200)}
+    else if(t==='power'){if(confirm('Power off OEmu?'))location.reload()}
+    else if(t.startsWith('vol'))navigator.vibrate?.(20);
+  });
+  // navbar
+  $('#navHome').onclick=()=>{Object.values(WM.wins).forEach(w=>w.win.classList.add('min'))};
+  $('#navBack').onclick=()=>history.back();
+  $('#navRecents').onclick=()=>{
+    const ids=Object.keys(WM.wins);if(!ids.length){alert('No recent apps');return}
+    const id=ids[ids.length-1];WM.focus(id);
+  };
+  // unlock
+  $('#unlockbtn').onclick=()=>$('#lock').classList.add('hidden');
+}
+
+function updateClock(){
+  const d=new Date();
+  const t=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  $('#statTime').textContent=t;
+  const lc=$('#lockclock');if(lc)lc.textContent=t;
+  const ld=$('#lockdate');if(ld)ld.textContent=d.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'});
+}
+function updateLockClock(){updateClock();setInterval(updateClock,1000)}
+
+/* ------------ Go ------------ */
+boot();
+</script>
+</body>
+</html>
